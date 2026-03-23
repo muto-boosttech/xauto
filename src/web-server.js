@@ -55,13 +55,16 @@ function authorized(secret, url, body) {
  * @param {{ port?: number; openBrowser?: boolean }} opts
  */
 export function startWebServer(opts = {}) {
-  const port =
+  const portRaw =
     opts.port !== undefined
-      ? opts.port
+      ? String(opts.port)
       : process.env.PORT
-        ? Number(process.env.PORT)
-        : 3847;
-  const host = opts.host ?? process.env.HOST ?? "127.0.0.1";
+        ? String(process.env.PORT)
+        : "3847";
+  const parsedPort = Number.parseInt(portRaw, 10);
+  const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 3847;
+  const hostRaw = opts.host ?? process.env.HOST ?? "127.0.0.1";
+  const host = String(hostRaw).trim() || "127.0.0.1";
   const secret = process.env.REVIEW_UI_TOKEN || "";
   const allowDaily = process.env.XAUTO_UI_ALLOW_GENERATE === "1";
   const publicDir = path.join(__dirname, "..", "public");
@@ -181,6 +184,10 @@ export function startWebServer(opts = {}) {
       console.error(e);
       json(res, 500, { error: String(/** @type {Error} */ (e).message || e) });
     }
+  });
+
+  server.on("error", (e) => {
+    console.error("[xauto] web server error", e);
   });
 
   server.listen(port, host, () => {
