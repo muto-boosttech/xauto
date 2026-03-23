@@ -1,0 +1,10 @@
+{
+  "timezone": "Asia/Tokyo",
+  "slots": [],
+  "daily_ideas_cron": "0 18 * * *",
+  "pre_analytics_cron": "30 17 * * *",
+  "due_posts_cron": "* * * * *",
+  "weekly_metrics_cron": "0 9 * * 1",
+  "weekly_report_cron": "0 10 * * 1",
+  "monthly_report_cron": "0 10 1 * *"
+}

@@ -1,0 +1,9 @@
+# Railway: リポジトリ連携時に Dockerfile ビルドを明示
+# https://docs.railway.com/reference/config-as-code
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Dockerfile の CMD（cloud-entry.mjs）を使うため未指定でよい

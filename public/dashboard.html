@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>X 投稿の承認</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9bb0;
+      --accent: #38bdf8;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --border: #2d3a4d;
+      font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      min-height: 100vh;
+      padding: 1.25rem;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; font-weight: 650; margin: 0 0 0.5rem; }
+    .note {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .note strong { color: var(--text); }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    label { font-size: 0.85rem; color: var(--muted); }
+    select, button {
+      font: inherit;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 0.45rem 0.75rem;
+    }
+    button.primary { background: #0c4a6e; border-color: #0369a1; color: #f0f9ff; }
+    button.danger { background: #450a0a; border-color: #7f1d1d; color: #fecaca; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .slot-hint {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .slot-hint code { color: var(--accent); font-size: 0.82rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .meta { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      font: inherit;
+      font-size: 0.95rem;
+      padding: 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0c1118;
+      color: var(--text);
+      resize: vertical;
+    }
+    .ng { font-size: 0.8rem; margin-top: 0.35rem; }
+    .ng.err { color: var(--bad); }
+    .ng.warn { color: var(--warn); }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.65rem; }
+    .msg { font-size: 0.85rem; margin-top: 0.35rem; }
+    .msg.ok { color: var(--ok); }
+    .msg.bad { color: var(--bad); }
+    .empty { color: var(--muted); padding: 2rem 0; text-align: center; }
+    .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.7s linear infinite; vertical-align: -0.15em; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>投稿案の承認</h1>
+    <div class="note">
+      <strong>この画面だけで操作できます</strong>（ターミナルでの入力は不要です）。<br />
+      承認した投稿は<strong>翌日（東京）</strong>の <strong>8:00 → 9:00 → 12:00 → 17:00 → 19:00</strong> に順番で予約されます。<br />
+      <span style="opacity:0.85">※ Claude のチャット画面（claude.ai）からこの PC のデータを直接触ることはできません。代わりにこのブラウザ画面を使います。</span>
+    </div>
+
+    <div class="toolbar">
+      <button type="button" id="reload">再読み込み</button>
+      <label>バッチ <select id="batchSel"></select></label>
+      <button type="button" id="btnDaily" class="primary" hidden>投稿案を5件つくる</button>
+    </div>
+
+    <div id="slotHint" class="slot-hint"></div>
+    <div id="root"><p class="empty"><span class="spinner"></span> 読み込み中…</p></div>
+  </div>
+
+  <script>
+    function qs() {
+      return new URLSearchParams(location.search);
+    }
+    function token() {
+      return qs().get("token") || "";
+    }
+    /** @param {string} path "/state" など @param {Record<string, string>} [extra] */
+    function apiUrl(path, extra) {
+      const params = new URLSearchParams();
+      if (token()) params.set("token", token());
+      if (extra) {
+        for (const [k, v] of Object.entries(extra)) {
+          if (v != null && v !== "") params.set(k, v);
+        }
+      }
+      const q = params.toString();
+      return "/api" + path + (q ? "?" + q : "");
+    }
+    async function loadState() {
+      const batch = document.getElementById("batchSel").value || "";
+      const r = await fetch(apiUrl("/state", batch ? { batch } : {}));
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+    async function loadBatches() {
+      const r = await fetch(apiUrl("/batches"));
+      if (!r.ok) return [];
+      const j = await r.json();
+      return j.batches || [];
+    }
+
+    function fmtSlot(iso) {
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      } catch {
+        return iso;
+      }
+    }
+
+    async function render() {
+      const root = document.getElementById("root");
+      const slotHint = document.getElementById("slotHint");
+      try {
+        const st = await loadState();
+        document.getElementById("btnDaily").hidden = !st.allowDailyGenerate;
+        slotHint.innerHTML = st.batchId
+          ? `翌日 <code>${st.tomorrowLabel}</code> の枠（空きは ${Math.max(0, 5 - st.nextSlotIndex)}/5）：` +
+            st.slots.map(fmtSlot).join(" → ")
+          : "";
+
+        if (!st.batchId || !st.items.length) {
+          root.innerHTML =
+            '<div class="empty">審査待ちの投稿案はありません。<br/>（自動の18時バッチ後、または「投稿案を5件つくる」後に表示されます）</div>';
+          return;
+        }
+
+        root.innerHTML = st.items
+          .map(
+            (it) => `
+          <div class="card" data-id="${it.local_id}">
+            <div class="meta">ID ${it.local_id} · ${it.category || ""} · フック ${it.hook_type || ""}</div>
+            <textarea id="tx-${it.local_id}">${escapeHtml(it.content)}</textarea>
+            <div class="ng ${it.ng && it.ng.errors && it.ng.errors.length ? "err" : "warn"}">
+              ${it.ng && it.ng.errors && it.ng.errors.length ? "NG: " + it.ng.errors.join(" / ") : ""}
+              ${it.ng && it.ng.warnings && it.ng.warnings.length ? "警告: " + it.ng.warnings.join(" / ") : ""}
+            </div>
+            <div class="actions">
+              <button type="button" class="primary" data-act="approve" data-id="${it.local_id}">承認して翌日に予約</button>
+              <button type="button" data-act="draft" data-id="${it.local_id}">下書きだけ保存</button>
+              <button type="button" class="danger" data-act="reject" data-id="${it.local_id}">却下</button>
+            </div>
+            <div class="msg" id="msg-${it.local_id}"></div>
+          </div>`
+          )
+          .join("");
+
+        root.querySelectorAll("button[data-act]").forEach((btn) => {
+          btn.addEventListener("click", () => onAction(btn.dataset.act, Number(btn.dataset.id)));
+        });
+      } catch (e) {
+        root.innerHTML = '<div class="empty" style="color:#f87171">読み込みに失敗しました。URL の token が正しいか、サーバが起動しているか確認してください。</div>';
+        console.error(e);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function onAction(act, id) {
+      const ta = document.getElementById("tx-" + id);
+      const msg = document.getElementById("msg-" + id);
+      const body = { localId: id, content: ta.value, token: token() };
+      let path = "";
+      if (act === "approve") path = "/approve";
+      if (act === "reject") path = "/reject";
+      if (act === "draft") path = "/draft";
+      msg.textContent = "処理中…";
+      msg.className = "msg";
+      const r = await fetch("/api" + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        msg.textContent = j.error || "失敗しました";
+        msg.className = "msg bad";
+        return;
+      }
+      if (act === "approve") {
+        msg.textContent = "予約しました: " + (j.scheduledAt || "");
+        msg.className = "msg ok";
+      } else if (act === "reject") {
+        msg.textContent = "却下しました";
+        msg.className = "msg ok";
+      } else {
+        msg.textContent = "下書きを保存しました";
+        msg.className = "msg ok";
+      }
+      await render();
+    }
+
+    document.getElementById("reload").addEventListener("click", render);
+
+    document.getElementById("btnDaily").addEventListener("click", async () => {
+      if (!confirm("投稿案を5件生成します（API利用）。よろしいですか？")) return;
+      const r = await fetch("/api/daily", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token(), refresh: true }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(j.error || "失敗しました");
+        return;
+      }
+      alert("batch_id: " + j.batchId);
+      await fillBatchSelect(j.batchId);
+      await render();
+    });
+
+    async function fillBatchSelect(preferredId) {
+      const sel = document.getElementById("batchSel");
+      const batches = await loadBatches();
+      sel.innerHTML = batches.length
+        ? batches.map((b) => `<option value="${b.id}">${b.id.slice(0, 8)}… (${b.count}件)</option>`).join("")
+        : '<option value="">—</option>';
+      if (preferredId && batches.some((b) => b.id === preferredId)) sel.value = preferredId;
+    }
+
+    document.getElementById("batchSel").addEventListener("change", render);
+
+    (async () => {
+      await fillBatchSelect(null);
+      await render();
+    })();
+  </script>
+</body>
+</html>

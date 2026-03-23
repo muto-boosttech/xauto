@@ -1,0 +1,16 @@
+# Render Blueprint（New → Blueprint）
+# 永続ディスクはダッシュボードの Web Service → Disks で後から追加し、Mount path /data を推奨。
+# ディスクなしでも起動は可能（再デプロイで DB は消えます）。
+
+services:
+  - type: web
+    name: xauto
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /data

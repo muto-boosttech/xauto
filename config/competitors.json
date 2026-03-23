@@ -1,0 +1,9 @@
+{
+  "handles": [
+    "oinu_koinu_13",
+    "hiu4f",
+    "findurtalents"
+  ],
+  "max_tweets_per_account": 6,
+  "snapshot_path": "competitor_snapshot.json"
+}
