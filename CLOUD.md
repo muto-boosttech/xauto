@@ -27,7 +27,7 @@ git commit -m "Initial commit: X automation + cloud entry"
 GitHub で **新しい空のリポジトリ** を作り、表示されたコマンドで push:
 
 ```bash
-git remote add origin https://github.com/あなたのユーザー名/xauto.git
+git remote add origin https://github.com/muto-boosttech/xauto.git
 git branch -M main
 git push -u origin main
 ```
