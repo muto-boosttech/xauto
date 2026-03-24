@@ -4,6 +4,7 @@
 import "dotenv/config";
 import { startSchedulerDaemon } from "./src/scheduler.js";
 import { startWebServer } from "./src/web-server.js";
+import { listScheduledPosts } from "./src/posts-store.js";
 
 const portRaw = process.env.PORT;
 const parsed = portRaw ? Number.parseInt(String(portRaw), 10) : Number.NaN;
@@ -22,3 +23,22 @@ process.on("unhandledRejection", (e) => {
 });
 
 startWebServer({ port, host, openBrowser: false });
+
+setTimeout(() => {
+  try {
+    const rows = listScheduledPosts(250);
+    const now = Date.now();
+    const overdue = rows.filter((r) => {
+      const t = Date.parse(r.scheduled_at);
+      return Number.isFinite(t) && t <= now;
+    });
+    console.log(
+      `[xauto] 予約投稿: DB上 ${rows.length} 件、時刻到来済み ${overdue.length} 件（先頭3件の scheduled_at: ${rows
+        .slice(0, 3)
+        .map((r) => r.scheduled_at)
+        .join(", ") || "なし"}）`
+    );
+  } catch (e) {
+    console.error("[xauto] 予約件数ログ失敗", e);
+  }
+}, 4000);

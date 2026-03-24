@@ -37,7 +37,7 @@ export async function processDueScheduledPosts() {
   const rows = db
     .prepare(
       `SELECT * FROM posts WHERE status = 'scheduled' AND scheduled_at IS NOT NULL
-       ORDER BY scheduled_at ASC LIMIT 15`
+       ORDER BY scheduled_at ASC LIMIT 200`
     )
     .all();
   const now = Date.now();

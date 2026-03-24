@@ -1,5 +1,5 @@
 import { checkNg } from "./ng-check.js";
-import { addCalendarDays, nextDaySlotsJstIso, tokyoYmd } from "./time-jst.js";
+import { addCalendarDays, nextDaySlotsJstIso, slotsForTokyoYmd, tokyoYmd } from "./time-jst.js";
 import {
   findLatestPendingBatchId,
   listPendingReviewByBatch,
@@ -83,7 +83,7 @@ export function approveAndSchedule(localId, content) {
   }
 
   const tomorrowYmd = addCalendarDays(tokyoYmd(), 1);
-  const slots = nextDaySlotsJstIso(SLOT_HOURS);
+  const slots = slotsForTokyoYmd(tomorrowYmd, SLOT_HOURS);
   let slotIdx = countScheduledForBatchOnDate(batchId, tomorrowYmd);
 
   if (content !== row.content) updatePostContent(localId, content);
