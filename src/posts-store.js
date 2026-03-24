@@ -133,3 +133,16 @@ export function countScheduledForBatchOnDate(batchId, tomorrowYmd) {
     .get(batchId, `${tomorrowYmd}%`);
   return row?.c ?? 0;
 }
+
+/** @param {number} [limit] */
+export function listScheduledPosts(limit = 30) {
+  const db = openPostsDb();
+  return db
+    .prepare(
+      `SELECT local_id, scheduled_at, category, char_count,
+       substr(content, 1, 120) AS preview, status
+       FROM posts WHERE status = 'scheduled' AND scheduled_at IS NOT NULL
+       ORDER BY scheduled_at ASC LIMIT ?`
+    )
+    .all(limit);
+}

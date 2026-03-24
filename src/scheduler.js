@@ -92,8 +92,8 @@ export function startSchedulerDaemon(opts) {
       async () => {
         try {
           await processDueScheduledPosts();
-        } catch {
-          /* ignore */
+        } catch (e) {
+          console.error("[cron] due_posts error", e);
         }
       },
       { timezone: tz }

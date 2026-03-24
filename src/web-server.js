@@ -11,6 +11,11 @@ import {
   listPendingBatches,
 } from "./review-actions.js";
 import { runDailyIdeasBatch } from "./daily-workflow.js";
+import { listScheduledPosts } from "./posts-store.js";
+import {
+  processDueScheduledPosts,
+  hasXCredentialsForScheduledPosts,
+} from "./scheduled-worker.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -170,6 +175,37 @@ export function startWebServer(opts = {}) {
           console.error(e);
           json(res, 500, { ok: false, error: String(/** @type {Error} */ (e).message || e) });
         }
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/scheduled") {
+        if (!authorized(secret, url)) {
+          json(res, 401, { error: "unauthorized" });
+          return;
+        }
+        const rows = listScheduledPosts(40);
+        const now = Date.now();
+        const withDue = rows.map((r) => ({
+          ...r,
+          due: Date.parse(r.scheduled_at) <= now,
+        }));
+        json(res, 200, {
+          serverTime: new Date().toISOString(),
+          xCredentialsOk: hasXCredentialsForScheduledPosts(),
+          scheduled: withDue,
+        });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/run-due") {
+        const raw = await readBody(req);
+        const body = /** @type {Record<string, unknown>} */ (JSON.parse(raw || "{}"));
+        if (!authorized(secret, url, body)) {
+          json(res, 401, { error: "unauthorized" });
+          return;
+        }
+        const out = await processDueScheduledPosts();
+        json(res, 200, out);
         return;
       }
 
