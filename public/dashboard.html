@@ -90,6 +90,22 @@
     .msg { font-size: 0.85rem; margin-top: 0.35rem; }
     .msg.ok { color: var(--ok); }
     .msg.bad { color: var(--bad); }
+    .due-panel { margin-bottom: 1.25rem; }
+    .due-panel .hint { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.6rem; }
+    .due-result {
+      margin-top: 0.65rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0c1118;
+      font-size: 0.82rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, monospace;
+    }
+    .due-result.ok { border-color: #065f46; color: var(--ok); }
+    .due-result.bad { border-color: #7f1d1d; color: var(--bad); }
+    .due-result.muted { color: var(--muted); }
     .empty { color: var(--muted); padding: 2rem 0; text-align: center; }
     .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.7s linear infinite; vertical-align: -0.15em; }
     @keyframes sp { to { transform: rotate(360deg); } }
@@ -108,6 +124,14 @@
       <button type="button" id="reload">再読み込み</button>
       <label>バッチ <select id="batchSel"></select></label>
       <button type="button" id="btnDaily" class="primary" hidden>投稿案を5件つくる</button>
+    </div>
+
+    <div class="due-panel card">
+      <p class="hint">
+        <strong>予約投稿の確認</strong>：時刻が来ている予約を、バックグラウンドと同じ処理で今すぐ X に送ります。Railway のログとあわせて動作確認に使えます。
+      </p>
+      <button type="button" id="btnRunDue" class="primary">今すぐ予約投稿を実行（due）</button>
+      <div id="dueResult" class="due-result muted" hidden></div>
     </div>
 
     <div id="slotHint" class="slot-hint"></div>
@@ -244,6 +268,46 @@
     }
 
     document.getElementById("reload").addEventListener("click", render);
+
+    document.getElementById("btnRunDue").addEventListener("click", async () => {
+      const btn = document.getElementById("btnRunDue");
+      const el = document.getElementById("dueResult");
+      el.hidden = false;
+      el.textContent = "実行中…";
+      el.className = "due-result muted";
+      btn.disabled = true;
+      try {
+        const r = await fetch("/api/run-due", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token() }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          el.textContent = j.error || "失敗しました（HTTP " + r.status + "）";
+          el.className = "due-result bad";
+          return;
+        }
+        const lines = [];
+        lines.push("時刻到達の予約件数: " + (j.dueQueued ?? "—"));
+        lines.push("X に投稿した件数: " + (j.posted ?? 0));
+        if (j.skipReason) lines.push("スキップ理由: " + j.skipReason);
+        if (j.errors && j.errors.length) lines.push("エラー:\n" + j.errors.join("\n"));
+        if (!j.skipReason && (!j.errors || !j.errors.length) && (j.posted ?? 0) === 0 && (j.dueQueued ?? 0) === 0) {
+          lines.push("（投稿対象の予約はありませんでした）");
+        }
+        el.textContent = lines.join("\n");
+        const bad = !!(j.skipReason || (j.errors && j.errors.length));
+        const good = !bad && (j.posted ?? 0) > 0;
+        const noneOk = !bad && (j.posted ?? 0) === 0;
+        el.className = "due-result " + (bad ? "bad" : good ? "ok" : noneOk ? "muted" : "ok");
+      } catch (e) {
+        el.textContent = String(e.message || e);
+        el.className = "due-result bad";
+      } finally {
+        btn.disabled = false;
+      }
+    });
 
     document.getElementById("btnDaily").addEventListener("click", async () => {
       if (!confirm("投稿案を5件生成します（API利用）。よろしいですか？")) return;

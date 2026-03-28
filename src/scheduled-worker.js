@@ -13,7 +13,7 @@ export function hasXCredentialsForScheduledPosts() {
 
 /**
  * 予約時刻が来た投稿を X に投稿
- * @returns {{ ok: boolean; posted: number; errors: string[]; skipReason?: string }}
+ * @returns {{ ok: boolean; posted: number; errors: string[]; skipReason?: string; dueQueued: number }}
  */
 export async function processDueScheduledPosts() {
   const errors = [];
@@ -21,7 +21,13 @@ export async function processDueScheduledPosts() {
     const msg =
       "[scheduled] X API 環境変数が不足しています（X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET）。予約投稿はスキップされます。";
     console.error(msg);
-    return { ok: false, posted: 0, errors: [msg], skipReason: "missing_x_credentials" };
+    return {
+      ok: false,
+      posted: 0,
+      errors: [msg],
+      skipReason: "missing_x_credentials",
+      dueQueued: 0,
+    };
   }
 
   let client;
@@ -30,7 +36,13 @@ export async function processDueScheduledPosts() {
   } catch (e) {
     const msg = `[scheduled] X クライアント初期化失敗: ${/** @type {Error} */ (e).message || e}`;
     console.error(msg);
-    return { ok: false, posted: 0, errors: [msg], skipReason: "x_client_error" };
+    return {
+      ok: false,
+      posted: 0,
+      errors: [msg],
+      skipReason: "x_client_error",
+      dueQueued: 0,
+    };
   }
 
   const db = openPostsDb();
@@ -61,5 +73,5 @@ export async function processDueScheduledPosts() {
     }
   }
 
-  return { ok: errors.length === 0, posted, errors };
+  return { ok: errors.length === 0, posted, errors, dueQueued: due.length };
 }
