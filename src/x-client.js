@@ -38,6 +38,9 @@ export async function postTweet(client, text) {
       return res.data;
     } catch (e) {
       lastErr = e;
+      const any = /** @type {{ code?: number; data?: unknown; message?: string }} */ (e);
+      if (any?.data != null) console.error("[x] tweet error detail", JSON.stringify(any.data));
+      else if (any?.message) console.error("[x] tweet error", any.message);
       const code = /** @type {{ code?: number; rateLimit?: { reset?: number } }} */ (e).code;
       if (code === 429) {
         const reset = /** @type {{ rateLimit?: { reset?: number } }} */ (e).rateLimit?.reset;

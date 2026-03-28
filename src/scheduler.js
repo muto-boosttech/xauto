@@ -86,19 +86,26 @@ export function startSchedulerDaemon(opts) {
     );
   }
 
-  if (cfg.due_posts_cron) {
-    cron.schedule(
-      cfg.due_posts_cron,
-      async () => {
-        try {
-          await processDueScheduledPosts();
-        } catch (e) {
-          console.error("[cron] due_posts error", e);
-        }
-      },
-      { timezone: tz }
-    );
+  const dueMsRaw = Number(process.env.DUE_POSTS_INTERVAL_MS);
+  const dueMs = Number.isFinite(dueMsRaw) && dueMsRaw >= 5000 ? dueMsRaw : 30_000;
+  let dueLock = false;
+  async function tickDuePosts() {
+    if (dueLock) return;
+    dueLock = true;
+    try {
+      const r = await processDueScheduledPosts();
+      if (r.posted > 0 || r.skipReason || r.errors.length) {
+        console.log("[due]", JSON.stringify(r));
+      }
+    } catch (e) {
+      console.error("[due] tick error", e);
+    } finally {
+      dueLock = false;
+    }
   }
+  setInterval(tickDuePosts, dueMs);
+  setTimeout(tickDuePosts, 8000);
+  console.log(`予約投稿チェック: 約 ${dueMs / 1000}s ごと（setInterval・Railway 向け）`);
 
   cron.schedule(
     cfg.weekly_metrics_cron || "0 9 * * 1",
@@ -150,6 +157,6 @@ export function startSchedulerDaemon(opts) {
 
   console.log("スケジューラ起動。Ctrl+C で終了。");
   console.log(
-    "— 毎日 18:00 投稿案×5（pending_review） / 予約投稿は毎分チェック / 確認は `node cli.js review` —"
+    "— 毎日 18:00 投稿案×5（pending_review） / 予約投稿は上記間隔でチェック / 確認は `node cli.js review` —"
   );
 }
